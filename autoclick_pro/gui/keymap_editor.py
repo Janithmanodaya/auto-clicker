@@ -65,13 +65,16 @@ class KeymapEditor(QDialog):
         # Keyboard grid
         grid = QGridLayout()
         self.selected_keys: List[str] = []
+        self.key_buttons: dict[str, QPushButton] = {}
         row = 0
         for row_keys in KEYS:
             col = 0
             for k in row_keys:
                 btn = QPushButton(k)
+                btn.setCheckable(True)
                 btn.clicked.connect(lambda _, name=k: self._toggle_key(name))
                 grid.addWidget(btn, row, col)
+                self.key_buttons[k] = btn
                 col += 1
             row += 1
         v.addLayout(grid)
@@ -100,6 +103,10 @@ class KeymapEditor(QDialog):
             self.selected_keys.remove(name)
         else:
             self.selected_keys.append(name)
+        # Visual toggle
+        btn = self.key_buttons.get(name)
+        if btn:
+            btn.setChecked(name in self.selected_keys)
 
     def result_action(self) -> dict | None:
         """

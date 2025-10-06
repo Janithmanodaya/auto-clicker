@@ -119,8 +119,27 @@ class MainWindow(QMainWindow):
         pv = QVBoxLayout(self.props)
         pv.setContentsMargins(8, 8, 8, 8)
         pv.addWidget(QLabel("Utilities"))
-        self.btn_detect_demo = QPushButton("Run Detect on First 'detect' Action")
+
+        # Detection test buttons
+        self.btn_detect_demo = QPushButton("Inspect First Detect (Template)")
         pv.addWidget(self.btn_detect_demo)
+        self.btn_detect_feature = QPushButton("Inspect First Detect (Feature)")
+        pv.addWidget(self.btn_detect_feature)
+
+        # Loop/label test
+        self.btn_loop_test = QPushButton("Test Loop Until Detect")
+        pv.addWidget(self.btn_loop_test)
+
+        # Keymap list manager
+        pv.addWidget(QLabel("Saved Keymaps"))
+        from PySide6.QtWidgets import QListWidget
+        self.keymap_list = QListWidget()
+        pv.addWidget(self.keymap_list)
+        self.btn_add_keymap = QPushButton("Add From Keymap Editor")
+        pv.addWidget(self.btn_add_keymap)
+        self.btn_insert_keymap = QPushButton("Insert Selected Keymap")
+        pv.addWidget(self.btn_insert_keymap)
+
         pv.addStretch()
 
         splitter.addWidget(self.tree)
@@ -152,6 +171,10 @@ class MainWindow(QMainWindow):
         self.action_capture.triggered.connect(self.on_capture)
         self.action_keymap.triggered.connect(self.on_keymap)
         self.btn_detect_demo.clicked.connect(self.on_detect_demo)
+        self.btn_detect_feature.clicked.connect(self.on_detect_feature)
+        self.btn_loop_test.clicked.connect(self.on_loop_test)
+        self.btn_add_keymap.clicked.connect(self.on_keymap_add_to_list)
+        self.btn_insert_keymap.clicked.connect(self.on_keymap_insert_selected)
 
     # Action handlers
     def on_record(self):
@@ -255,7 +278,7 @@ class MainWindow(QMainWindow):
                 self.statusBar().showMessage(f"Captured template: {tmpl_path}")
 
     def on_detect_demo(self):
-        # Visual inspector for first detect action
+        # Visual inspector for first detect action (template)
         from autoclick_pro.util.screen import grab_screen
         from autoclick_pro.detect.template_matcher import match_template
         from autoclick_pro.gui.detect_inspector import DetectInspector
@@ -268,3 +291,65 @@ class MainWindow(QMainWindow):
                 dlg = DetectInspector(self, screenshot_path=Path(screen), bbox=res.bbox, score=res.score)
                 dlg.exec()
                 break
+
+    def on_detect_feature(self):
+        # Visual inspector for first detect action using feature matching
+        from autoclick_pro.util.screen import grab_screen
+        from autoclick_pro.detect.feature_matcher import feature_match
+        from autoclick_pro.gui.detect_inspector import DetectInspector
+
+        for a in self.editor.actions():
+            if a.type == "detect":
+                screen = grab_screen()
+                conf = float(a.params.get("conf", 0.5))
+                res = feature_match(Path(screen), Path(str(a.target)), confidence_threshold=conf)
+                cands = [ (c.bbox, c.score) for c in res.candidates ]
+                first = cands[0] if cands else ((None), 0.0)
+                bbox = first[0] if cands else None
+                score = first[1] if cands else 0.0
+                dlg = DetectInspector(self, screenshot_path=Path(screen), bbox=bbox, score=score, candidates=cands)
+                dlg.exec()
+                break
+
+    def on_loop_test(self):
+        # Build a demo macro: label -> detect -> conditional_jump -> loop_until
+        actions = [
+            {"id": "lbl1", "type": "label", "target": "start"},
+            {"id": "d1", "type": "detect", "target": self._first_detect_target(), "params": {"conf": 0.85, "method": "template"}},
+            {"id": "cj1", "type": "conditional_jump", "params": {"test": "last_detect", "true_target": "done", "false_target": "loop"}},
+            {"id": "loop", "type": "loop_until", "params": {"label": "start", "until": {"test": "last_detect", "value": True}, "max_iters": 50}},
+            {"id": "done", "type": "key_sequence", "params": {"sequence": ["Detection succeeded", "ENTER"], "text_mode": True}},
+        ]
+        self.engine.set_simulation(True)  # keep simulation for safety
+        self.engine.start(actions)
+
+    def _first_detect_target(self) -> str | None:
+        for a in self.editor.actions():
+            if a.type == "detect" and a.target:
+                return str(a.target)
+        return None
+
+    def on_keymap_add_to_list(self):
+        # Use keymap editor to create and store an action in the list
+        from autoclick_pro.gui.keymap_editor import KeymapEditor
+        dlg = KeymapEditor(self)
+        if dlg.exec():
+            act = dlg.result_action()
+            if act:
+                from PySide6.QtWidgets import QListWidgetItem
+                item = QListWidgetItem(str(act.get("params")))
+                item.setData(Qt.ItemDataRole.UserRole, act)
+                self.keymap_list.addItem(item)
+
+    def on_keymap_insert_selected(self):
+        # Insert selected keymap action into macro editor
+        item = self.keymap_list.currentItem()
+        if not item:
+            return
+        act = item.data(Qt.ItemDataRole.UserRole)
+        from autoclick_pro.data.model import Action as ActionModel
+        a = ActionModel(id=f"a{len(self.editor.actions())+1}", type=act["type"], target=None, params=act.get("params", {}))
+        actions = self.editor.actions()
+        actions.append(a)
+        self.editor.set_actions(actions)
+        self.statusBar().showMessage("Inserted keymap action into macro")

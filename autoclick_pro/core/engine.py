@@ -71,14 +71,20 @@ class Engine:
 
     def _run(self, actions: list[dict]) -> None:
         self._emit("Running")
-        # Build index mapping for jumps
+        # Build index mapping for jumps and labels
         id_to_index: dict[str, int] = {}
+        label_to_index: dict[str, int] = {}
         for i, a in enumerate(actions):
             aid = str(a.get("id") or "")
             if aid:
                 id_to_index[aid] = i
+            if a.get("type") == "label":
+                lname = str(a.get("target") or aid)
+                if lname:
+                    label_to_index[lname] = i
 
         i = 0
+        loop_iters: dict[int, int] = {}
         while i < len(actions):
             if self._stop.is_set():
                 break
@@ -87,7 +93,7 @@ class Engine:
 
             action = actions[i]
             try:
-                next_idx = self._execute(action, id_to_index=id_to_index, current_index=i, actions=actions)
+                next_idx = self._execute(action, id_to_index=id_to_index | label_to_index, current_index=i, actions=actions, loop_iters=loop_iters)
             except Exception as e:
                 self._log.error("engine_action_error", index=i, error=str(e))
                 break
@@ -99,7 +105,7 @@ class Engine:
 
         self._emit("Idle")
 
-    def _execute(self, action: dict, *, id_to_index: dict[str, int] | None = None, current_index: int | None = None, actions: list[dict] | None = None) -> int | None:
+    def _execute(self, action: dict, *, id_to_index: dict[str, int] | None = None, current_index: int | None = None, actions: list[dict] | None = None, loop_iters: dict[int, int] | None = None) -> int | None:
         t = action.get("type")
         params = action.get("params", {})
         delay_before = int(action.get("delay_before_ms", 0))
@@ -136,17 +142,29 @@ class Engine:
                 self._log.info("key_sequence", sequence=seq, text_mode=text_mode)
 
             elif t == "detect":
-                # Capture current screen and run template match
+                # Capture current screen and run template match or feature match
                 from pathlib import Path
                 from autoclick_pro.util.screen import grab_screen
                 from autoclick_pro.detect.template_matcher import match_template
+                from autoclick_pro.detect.feature_matcher import feature_match
 
                 tmpl = action.get("target")
                 conf = float(params.get("conf", 0.85))
+                method = params.get("method", "template")
                 screen_path = grab_screen()
-                res = match_template(Path(screen_path), Path(str(tmpl)), confidence_threshold=conf)
-                self._log.info("detect_result", target=tmpl, found=res.found, score=res.score, bbox=res.bbox)
-                self._context["last_detect"] = {"found": res.found, "bbox": res.bbox, "score": res.score}
+                if method == "feature":
+                    res = feature_match(Path(screen_path), Path(str(tmpl)), confidence_threshold=conf)
+                    # Normalize to first/best candidate
+                    best = res.candidates[0] if res.candidates else None
+                    found = best is not None and best.score >= conf
+                    bbox = best.bbox if best else None
+                    score = best.score if best else 0.0
+                    self._log.info("detect_result_feature", target=tmpl, found=found, score=score, bbox=bbox, candidates=len(res.candidates))
+                    self._context["last_detect"] = {"found": found, "bbox": bbox, "score": score, "candidates": [c.to_dict() for c in res.candidates]}
+                else:
+                    res = match_template(Path(screen_path), Path(str(tmpl)), confidence_threshold=conf)
+                    self._log.info("detect_result", target=tmpl, found=res.found, score=res.score, bbox=res.bbox)
+                    self._context["last_detect"] = {"found": res.found, "bbox": res.bbox, "score": res.score}
                 action.setdefault("result", self._context["last_detect"])
 
             elif t == "conditional_jump":
@@ -173,6 +191,52 @@ class Engine:
                 else:
                     self._log.info("conditional_jump_no_target", cond=cond)
                     # fall-through (continue to next action)
+
+            elif t == "label":
+                # No-op; labels are jump targets
+                self._log.info("label", name=action.get("target") or action.get("id"))
+
+            elif t == "loop_until":
+                # Params:
+                # {"label": "start", "until": {"test": "last_detect", "value": True}, "max_iters": 100}
+                label = params.get("label")
+                until = params.get("until", {"test": "last_detect", "value": True})
+                max_iters = int(params.get("max_iters", 100))
+                # Evaluate condition
+                test = until.get("test", "last_detect")
+                value = until.get("value", True)
+                cond = False
+                if test == "last_detect":
+                    ld = self._context.get("last_detect")
+                    cond = bool(ld and bool(ld.get("found")) == bool(value))
+                elif isinstance(test, str) and test.startswith("var:"):
+                    name = test.split(":", 1)[1]
+                    cond = bool(self._context.get(name)) == bool(value)
+
+                idx_key = int(current_index if current_index is not None else -1)
+                if loop_iters is not None:
+                    count = loop_iters.get(idx_key, 0)
+                else:
+                    count = 0
+
+                if cond:
+                    self._log.info("loop_until_condition_met", label=label, iters=count)
+                    # continue to next action
+                    return None
+                elif count >= max_iters:
+                    self._log.warning("loop_until_max_iters", label=label, max_iters=max_iters)
+                    return None
+                else:
+                    # increment and jump to label
+                    if loop_iters is not None:
+                        loop_iters[idx_key] = count + 1
+                    if label and id_to_index and label in id_to_index:
+                        next_index = id_to_index[label]
+                        self._log.info("loop_until_jump", label=label, next_index=next_index, iters=loop_iters.get(idx_key, 0))
+                        return next_index
+                    else:
+                        self._log.warning("loop_until_label_not_found", label=label)
+                        return None
 
             else:
                 self._log.warning("unknown_action_type", type=t)
