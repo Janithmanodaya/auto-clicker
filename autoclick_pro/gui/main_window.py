@@ -46,6 +46,8 @@ class MainWindow(QMainWindow):
         # Toolbar
         tb = QToolBar("Main")
         tb.setMovable(False)
+        # Show text beside icons to improve readability on dark backgrounds
+        tb.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
         self.addToolBar(tb)
 
         style = self.style()

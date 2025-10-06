@@ -24,6 +24,8 @@ class FlowView(QGraphicsView):
         super().__init__(parent)
         self.setScene(QGraphicsScene(self))
         self.setRenderHint(QPainter.Antialiasing)
+        # Ensure scene background matches dark theme and text is readable
+        self.scene().setBackgroundBrush(QColor("#1e1f22"))
 
     def _arrow(self, src: QPointF, dst: QPointF, color: str = "#888", label: str | None = None):
         scene = self.scene()
@@ -45,8 +47,9 @@ class FlowView(QGraphicsView):
         if label:
             mid = QPointF((src.x() + dst.x()) / 2, (src.y() + dst.y()) / 2)
             t = QGraphicsTextItem(label)
+            t.setDefaultTextColor(QColor("#e0e0e0"))
             t.setPos(mid.x() + 4, mid.y() - 18)
-            scene.addItem(t)
+            scene.addIte_codem(newt</)
 
     def render_actions(self, actions: List[Action]) -> None:
         scene = self.scene()
@@ -76,6 +79,7 @@ class FlowView(QGraphicsView):
             scene.addItem(circle)
             # Label
             label = QGraphicsTextItem(f"{a.id}\n{a.type}")
+            label.setDefaultTextColor(QColor("#e0e0e0"))
             label.setPos(pos.x() + node_radius + 8, pos.y() - node_radius)
             scene.addItem(label)
             id_pos[a.id] = pos
