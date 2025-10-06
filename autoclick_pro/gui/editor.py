@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import List, Optional
+import threading
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
@@ -26,6 +27,7 @@ class MacroEditor(QWidget):
     properties inspector, and basic undo/redo.
     """
     actions_changed = Signal()
+    pick_captured = Signal(int, int)  # x, y from global click picker
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
@@ -64,6 +66,17 @@ class MacroEditor(QWidget):
         pf.addRow(QLabel("Delay after (ms)"), self.input_delay_after)
         pf.addRow(QLabel("Repeat count"), self.input_repeat)
 
+        # Action add row (separate buttons, no dropdown needed for adding)
+        add_row = QHBoxLayout()
+        self.btn_add_wait = QPushButton("Add Wait")
+        self.btn_add_click_pick = QPushButton("Pick Click (X,Y)")
+        self.btn_add_keyseq = QPushButton("Add Key Sequence")
+        self.btn_add_label = QPushButton("Add Label")
+        add_row.addWidget(self.btn_add_wait)
+        add_row.addWidget(self.btn_add_click_pick)
+        add_row.addWidget(self.btn_add_keyseq)
+        add_row.addWidget(self.btn_add_label)
+
         # Buttons
         btns = QHBoxLayout()
         self.btn_add = QPushButton("Add Action")
@@ -79,6 +92,7 @@ class MacroEditor(QWidget):
 
         v = QVBoxLayout()
         v.addWidget(self.timeline)
+        v.addLayout(add_row)
         v.addLayout(btns)
 
         root.addLayout(v, 2)
@@ -92,6 +106,14 @@ class MacroEditor(QWidget):
         self.btn_apply.clicked.connect(self.apply_changes)
         self.btn_undo.clicked.connect(self.undo)
         self.btn_redo.clicked.connect(self.redo)
+
+        # Connect add-row actions
+        self.btn_add_wait.clicked.connect(self.add_wait_action)
+        self.btn_add_click_pick.clicked.connect(self.add_click_pick)
+        self.btn_add_keyseq.clicked.connect(self.add_keyseq_action)
+        self.btn_add_label.clicked.connect(self.add_label_action)
+
+        self.pick_captured.connect(self._on_pick_captured)
 
     # Public API
 
@@ -143,6 +165,10 @@ class MacroEditor(QWidget):
     # Handlers
 
     def add_action(self) -> None:
+        # Default add remains wait for backward compatibility
+        self.add_wait_action()
+
+    def add_wait_action(self) -> None:
         self._push_undo()
         a = Action(
             id=f"a{self.timeline.count()+1}",
@@ -159,12 +185,85 @@ class MacroEditor(QWidget):
         self.timeline.setCurrentItem(item)
         self.actions_changed.emit()
 
+    def add_keyseq_action(self) -> None:
+        self._push_undo()
+        a = Action(
+            id=f"a{self.timeline.count()+1}",
+            type="key_sequence",
+            target=None,
+            params={"sequence": ["Hello world", "ENTER"], "text_mode": True},
+        )
+        item = QListWidgetItem(self._format_action(a))
+        item.setData(Qt.ItemDataRole.UserRole, a)
+        self.timeline.addItem(item)
+        self.timeline.setCurrentItem(item)
+        self.actions_changed.emit()
+
+    def add_label_action(self) -> None:
+        self._push_undo()
+        name = f"label_{self.timeline.count()+1}"
+        a = Action(
+            id=name,
+            type="label",
+            target=name,
+            params={},
+        )
+        item = QListWidgetItem(self._format_action(a))
+        item.setData(Qt.ItemDataRole.UserRole, a)
+        self.timeline.addItem(item)
+        self.timeline.setCurrentItem(item)
+        self.actions_changed.emit()
+
+    # Click picker using a one-shot global mouse listener
+    def add_click_pick(self) -> None:
+        # Hide the window temporarily to avoid accidental clicks inside the app
+        w = self.window()
+        if w:
+            w.hide()
+
+        def _worker():
+            from pynput import mouse
+
+            def on_click(x, y, button, pressed):
+                if pressed:
+                    # Emit signal to UI thread and stop listener
+                    self.pick_captured.emit(int(x), int(y))
+                    return False
+                return True
+
+            with mouse.Listener(on_click=on_click) as listener:
+                listener.join()
+
+        threading.Thread(target=_worker, daemon=True).start()
+
     def remove_selected(self) -> None:
         idx = self.timeline.currentRow()
         if idx >= 0:
             self._push_undo()
             self.timeline.takeItem(idx)
             self.actions_changed.emit()
+
+    def _on_pick_captured(self, x: int, y: int) -> None:
+        # Restore window
+        w = self.window()
+        if w:
+            w.showNormal()
+            w.raise_()
+            w.activateWindow()
+
+        # Add mouse_click action with captured coordinates
+        self._push_undo()
+        a = Action(
+            id=f"a{self.timeline.count()+1}",
+            type="mouse_click",
+            target=None,
+            params={"x": x, "y": y, "button": "left"},
+        )
+        item = QListWidgetItem(self._format_action(a))
+        item.setData(Qt.ItemDataRole.UserRole, a)
+        self.timeline.addItem(item)
+        self.timeline.setCurrentItem(item)
+        self.actions_changed.emit()
 
     def apply_changes(self) -> None:
         item = self.timeline.currentItem()

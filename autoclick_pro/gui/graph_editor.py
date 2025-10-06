@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import List, Dict
 
 from PySide6.QtCore import QPointF, Signal
-from PySide6.QtGui import QPen, QColor
+from PySide6.QtGui import QPen, QColor, QPainter
 from PySide6.QtWidgets import (
     QWidget,
     QGraphicsView,
@@ -30,7 +30,9 @@ class GraphEditor(QWidget):
         self.view = QGraphicsView()
         self.scene = QGraphicsScene(self.view)
         self.view.setScene(self.scene)
-        self.view.setRenderHint(self.view.RenderHint.Antialiasing)
+        self.view.setRenderHint(QPainter.Antialiasing)
+        # Match dark theme background
+        self.scene.setBackgroundBrush(QColor("#1e1f22"))
         v.addWidget(self.view)
 
         # Node registry
@@ -60,6 +62,7 @@ class GraphEditor(QWidget):
             self._nodes[a.id] = circle
 
             label = QGraphicsTextItem(f"{a.id}\n{a.type}")
+            label.setDefaultTextColor(QColor("#e0e0e0"))
             label.setPos(x + radius * 2 + 6, y - 2)
             self.scene.addItem(label)
 

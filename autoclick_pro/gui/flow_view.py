@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import List, Dict, Tuple
 
 from PySide6.QtCore import QPointF, QRectF
-from PySide6.QtGui import QPen, QColor, QPolygonF
+from PySide6.QtGui import QPen, QColor, QPolygonF, QPainter
 from PySide6.QtWidgets import (
     QGraphicsView,
     QGraphicsScene,
@@ -23,7 +23,9 @@ class FlowView(QGraphicsView):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setScene(QGraphicsScene(self))
-        self.setRenderHint(self.RenderHint.Antialiasing)
+        self.setRenderHint(QPainter.Antialiasing)
+        # Ensure scene background matches dark theme and text is readable
+        self.scene().setBackgroundBrush(QColor("#1e1f22"))
 
     def _arrow(self, src: QPointF, dst: QPointF, color: str = "#888", label: str | None = None):
         scene = self.scene()
@@ -45,6 +47,7 @@ class FlowView(QGraphicsView):
         if label:
             mid = QPointF((src.x() + dst.x()) / 2, (src.y() + dst.y()) / 2)
             t = QGraphicsTextItem(label)
+            t.setDefaultTextColor(QColor("#e0e0e0"))
             t.setPos(mid.x() + 4, mid.y() - 18)
             scene.addItem(t)
 
@@ -76,6 +79,7 @@ class FlowView(QGraphicsView):
             scene.addItem(circle)
             # Label
             label = QGraphicsTextItem(f"{a.id}\n{a.type}")
+            label.setDefaultTextColor(QColor("#e0e0e0"))
             label.setPos(pos.x() + node_radius + 8, pos.y() - node_radius)
             scene.addItem(label)
             id_pos[a.id] = pos

@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QStatusBar,
     QPushButton,
+    QStyle,
 )
 
 from autoclick_pro.logging.logger import get_logger
@@ -45,19 +46,31 @@ class MainWindow(QMainWindow):
         # Toolbar
         tb = QToolBar("Main")
         tb.setMovable(False)
+        # Show text beside icons to improve readability on dark backgrounds
+        tb.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
         self.addToolBar(tb)
 
         style = self.style()
-        # Qt does not provide a MediaRecord standard icon; use Apply as a reasonable substitute
-        self.action_record = QAction(style.standardIcon(style.SP_DialogApplyButton), "Record", self)
-        self.action_play = QAction(style.standardIcon(style.SP_MediaPlay), "Play", self)
-        self.action_pause = QAction(style.standardIcon(style.SP_MediaPause), "Pause", self)
-        self.action_stop = QAction(style.standardIcon(style.SP_MediaStop), "Stop", self)
-        self.action_estop = QAction(style.standardIcon(style.SP_BrowserStop), "E-Stop", self)
-        self.action_save = QAction(style.standardIcon(style.SP_DialogSaveButton), "Save", self)
-        self.action_load = QAction(style.standardIcon(style.SP_DialogOpenButton), "Load", self)
-        self.action_export = QAction(style.standardIcon(style.SP_ComputerIcon), "Export", self)
-        self.action_capture = QAction(style.standardIcon(style.SP_FileIcon), "Capture Object", self)
+
+        # Helper to resolve a standard icon with fallbacks across Qt/PySide versions
+        def std_icon(*candidates: str):
+            for name in candidates:
+                sp = getattr(QStyle, name, None)
+                if sp is not None:
+                    return style.standardIcon(sp)
+            # last-resort generic icon
+            return style.standardIcon(QStyle.SP_MessageBoxInformation)
+
+        # Qt does not provide a MediaRecord standard icon; use Apply/Yes/Ok as reasonable substitutes
+        self.action_record = QAction(std_icon("SP_DialogApplyButton", "SP_DialogYesButton", "SP_DialogOkButton"), "Record", self)
+        self.action_play = QAction(std_icon("SP_MediaPlay", "SP_ArrowForward"), "Play", self)
+        self.action_pause = QAction(std_icon("SP_MediaPause", "SP_MediaStop"), "Pause", self)
+        self.action_stop = QAction(std_icon("SP_MediaStop", "SP_BrowserStop"), "Stop", self)
+        self.action_estop = QAction(std_icon("SP_BrowserStop", "SP_MessageBoxCritical"), "E-Stop", self)
+        self.action_save = QAction(std_icon("SP_DialogSaveButton", "SP_DialogApplyButton"), "Save", self)
+        self.action_load = QAction(std_icon("SP_DialogOpenButton", "SP_DirOpenIcon" if hasattr(QStyle, "SP_DirOpenIcon") else "SP_DialogOpenButton"), "Load", self)
+        self.action_export = QAction(std_icon("SP_ComputerIcon", "SP_DriveHDIcon"), "Export", self)
+        self.action_capture = QAction(std_icon("SP_FileIcon", "SP_DialogOpenButton"), "Capture Object", self)
         self.action_simulation = QAction("Simulation", self)
         self.action_simulation.setCheckable(True)
         self.action_simulation.setChecked(True)
@@ -73,9 +86,9 @@ class MainWindow(QMainWindow):
         self.action_capture.setShortcut("Ctrl+Shift+C")
 
         # Keymap editor action
-        self.action_keymap = QAction(style.standardIcon(style.SP_DirIcon), "Keymap Editor", self)
+        self.action_keymap = QAction(std_icon("SP_DirIcon", "SP_DirOpenIcon", "SP_DialogOpenButton"), "Keymap Editor", self)
         # Label manager action
-        self.action_label_manager = QAction(style.standardIcon(style.SP_DialogYesButton), "Label Manager", self)
+        self.action_label_manager = QAction(std_icon("SP_DialogYesButton", "SP_DialogOkButton", "SP_DialogApplyButton"), "Label Manager", self)
 
         for a in (
             self.action_record,
@@ -92,6 +105,10 @@ class MainWindow(QMainWindow):
         tb.addSeparator()
         for a in (self.action_save, self.action_load, self.action_export):
             tb.addAction(a)
+        tb.addSeparator()
+        # Instructions/help
+        self.action_instructions = QAction(std_icon("SP_MessageBoxInformation", "SP_DialogHelpButton"), "Instructions", self)
+        tb.addAction(self.action_instructions)
         tb.addSeparator()
         tb.addAction(self.action_simulation)
 
@@ -206,6 +223,7 @@ class MainWindow(QMainWindow):
         self.action_capture.triggered.connect(self.on_capture)
         self.action_keymap.triggered.connect(self.on_keymap)
         self.action_label_manager.triggered.connect(self.on_label_manager)
+        self.action_instructions.triggered.connect(self.on_instructions)
         self.btn_detect_demo.clicked.connect(self.on_detect_demo)
         self.btn_detect_feature.clicked.connect(self.on_detect_feature)
         self.btn_loop_test.clicked.connect(self.on_loop_test)
@@ -428,3 +446,9 @@ class MainWindow(QMainWindow):
         self.flow.render_actions(actions)
         self.graph.render_actions(actions)
         self.statusBar().showMessage("Inserted keymap action into macro")
+
+    def on_instructions(self):
+        # Open instructions/help dialog
+        from autoclick_pro.gui.instructions import InstructionsDialog
+        dlg = InstructionsDialog(self)
+        dlg.exec()
