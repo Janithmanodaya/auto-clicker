@@ -32,6 +32,9 @@ fi
 # shellcheck source=/dev/null
 source .venv/bin/activate
 
+# Ensure pip exists (handles envs created without pip)
+python -m ensurepip --upgrade
+
 python -m pip install --upgrade pip wheel setuptools
 pip install -r requirements.txt
 

@@ -33,6 +33,9 @@ if not exist ".venv" (
 
 call ".venv\Scripts\activate.bat"
 
+rem Ensure pip exists in the venv (handles cases where pip was not bootstrapped)
+python -m ensurepip --upgrade
+
 python -m pip install --upgrade pip wheel setuptools
 pip install -r requirements.txt
 

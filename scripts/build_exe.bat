@@ -14,23 +14,29 @@ if exist ".venv\Scripts\activate.bat" (
 )
 
 set "PYTHON_BIN="
-where py >nul 2>nul
-if %errorlevel%==0 (
-  set "PYTHON_BIN=py -3"
+
+rem Prefer the venv's Python if available
+if exist ".venv\Scripts\python.exe" (
+  set "PYTHON_BIN=.venv\Scripts\python.exe"
 ) else (
-  where python >nul 2>nul
+  where py >nul 2>nul
   if %errorlevel%==0 (
-    set "PYTHON_BIN=python"
+    set "PYTHON_BIN=py -3"
   ) else (
-    echo Python not found. Please install Python 3.10+.
-    popd
-    pause
-    exit /b 1
+    where python >nul 2>nul
+    if %errorlevel%==0 (
+      set "PYTHON_BIN=python"
+    ) else (
+      echo Python not found. Please install Python 3.10+.
+      popd
+      pause
+      exit /b 1
+    )
   )
 )
 
-%PYTHON_BIN% --version
-%PYTHON_BIN% "scripts\build.py" --onefile %*
+"%PYTHON_BIN%" --version
+"%PYTHON_BIN%" "scripts\build.py" --onefile %*
 set "ERR=%ERRORLEVEL%"
 
 if not "%ERR%"=="0" (

@@ -8,7 +8,19 @@ if [[ -f ".venv/bin/activate" ]]; then
   source .venv/bin/activate
 fi
 
-python3 --version || python --version
-python3 scripts/build.py --onefile "$@" || python scripts/build.py --onefile "$@"
+PYTHON_BIN=""
+if [[ -x ".venv/bin/python" ]]; then
+  PYTHON_BIN=".venv/bin/python"
+elif command -v python3 >/dev/null 2>&1; then
+  PYTHON_BIN="python3"
+elif command -v python >/dev/null 2>&1; then
+  PYTHON_BIN="python"
+else
+  echo "Python not found. Please install Python 3.10+."
+  exit 1
+fi
+
+"$PYTHON_BIN" --version
+"$PYTHON_BIN" scripts/build.py --onefile "$@"
 
 echo "Build completed. Check the 'dist' folder."
