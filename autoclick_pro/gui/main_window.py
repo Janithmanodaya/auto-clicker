@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QStatusBar,
     QPushButton,
+    QStyle,
 )
 
 from autoclick_pro.logging.logger import get_logger
@@ -48,16 +49,26 @@ class MainWindow(QMainWindow):
         self.addToolBar(tb)
 
         style = self.style()
-        # Qt does not provide a MediaRecord standard icon; use Apply as a reasonable substitute
-        self.action_record = QAction(style.standardIcon(style.SP_DialogApplyButton), "Record", self)
-        self.action_play = QAction(style.standardIcon(style.SP_MediaPlay), "Play", self)
-        self.action_pause = QAction(style.standardIcon(style.SP_MediaPause), "Pause", self)
-        self.action_stop = QAction(style.standardIcon(style.SP_MediaStop), "Stop", self)
-        self.action_estop = QAction(style.standardIcon(style.SP_BrowserStop), "E-Stop", self)
-        self.action_save = QAction(style.standardIcon(style.SP_DialogSaveButton), "Save", self)
-        self.action_load = QAction(style.standardIcon(style.SP_DialogOpenButton), "Load", self)
-        self.action_export = QAction(style.standardIcon(style.SP_ComputerIcon), "Export", self)
-        self.action_capture = QAction(style.standardIcon(style.SP_FileIcon), "Capture Object", self)
+
+        # Helper to resolve a standard icon with fallbacks across Qt/PySide versions
+        def std_icon(*candidates: str):
+            for name in candidates:
+                sp = getattr(QStyle, name, None)
+                if sp is not None:
+                    return style.standardIcon(sp)
+            # last-resort generic icon
+            return style.standardIcon(QStyle.SP_MessageBoxInformation)
+
+        # Qt does not provide a MediaRecord standard icon; use Apply/Yes/Ok as reasonable substitutes
+        self.action_record = QAction(std_icon("SP_DialogApplyButton", "SP_DialogYesButton", "SP_DialogOkButton"), "Record", self)
+        self.action_play = QAction(std_icon("SP_MediaPlay", "SP_ArrowForward"), "Play", self)
+        self.action_pause = QAction(std_icon("SP_MediaPause", "SP_MediaStop"), "Pause", self)
+        self.action_stop = QAction(std_icon("SP_MediaStop", "SP_BrowserStop"), "Stop", self)
+        self.action_estop = QAction(std_icon("SP_BrowserStop", "SP_MessageBoxCritical"), "E-Stop", self)
+        self.action_save = QAction(std_icon("SP_DialogSaveButton", "SP_DialogApplyButton"), "Save", self)
+        self.action_load = QAction(std_icon("SP_DialogOpenButton", "SP_DirOpenIcon" if hasattr(QStyle, "SP_DirOpenIcon") else "SP_DialogOpenButton"), "Load", self)
+        self.action_export = QAction(std_icon("SP_ComputerIcon", "SP_DriveHDIcon"), "Export", self)
+        self.action_capture = QAction(std_icon("SP_FileIcon", "SP_DialogOpenButton"), "Capture Object", self)
         self.action_simulation = QAction("Simulation", self)
         self.action_simulation.setCheckable(True)
         self.action_simulation.setChecked(True)
