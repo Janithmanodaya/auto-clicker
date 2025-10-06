@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import List, Dict, Tuple
 
 from PySide6.QtCore import QPointF, QRectF
-from PySide6.QtGui import QPen, QColor, QPolygonF
+from PySide6.QtGui import QPen, QColor, QPolygonF, QPainter
 from PySide6.QtWidgets import (
     QGraphicsView,
     QGraphicsScene,
@@ -23,7 +23,7 @@ class FlowView(QGraphicsView):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setScene(QGraphicsScene(self))
-        self.setRenderHint(self.RenderHint.Antialiasing)
+        self.setRenderHint(QPainter.Antialiasing)
 
     def _arrow(self, src: QPointF, dst: QPointF, color: str = "#888", label: str | None = None):
         scene = self.scene()

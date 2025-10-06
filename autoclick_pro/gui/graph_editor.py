@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import List, Dict
 
 from PySide6.QtCore import QPointF, Signal
-from PySide6.QtGui import QPen, QColor
+from PySide6.QtGui import QPen, QColor, QPainter
 from PySide6.QtWidgets import (
     QWidget,
     QGraphicsView,
@@ -30,7 +30,7 @@ class GraphEditor(QWidget):
         self.view = QGraphicsView()
         self.scene = QGraphicsScene(self.view)
         self.view.setScene(self.scene)
-        self.view.setRenderHint(self.view.RenderHint.Antialiasing)
+        self.view.setRenderHint(QPainter.Antialiasing)
         v.addWidget(self.view)
 
         # Node registry
