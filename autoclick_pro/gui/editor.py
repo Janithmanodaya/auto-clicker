@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -23,12 +23,14 @@ from autoclick_pro.data.model import Action
 class MacroEditor(QWidget):
     """
     Simple list-based macro editor with reorder, add/remove actions,
-    and a properties inspector for the selected action.
+    properties inspector, and basic undo/redo.
     """
+    actions_changed = Signal()
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
-        root = QHBoxLayout(self)
+        root = QHBoxLayout(s_codeelnewf</)
+lf)
 
         # Timeline list
         self.timeline = QListWidget()
@@ -68,8 +70,8 @@ class MacroEditor(QWidget):
         self.btn_add = QPushButton("Add Action")
         self.btn_remove = QPushButton("Remove Selected")
         self.btn_apply = QPushButton("Apply Changes")
-        btns.addWidget(self.btn_add)
-        btns.addWidget(self.btn_remove)
+        self.btn_undo = QPushButton("Undo")
+        self.btn_red.btn_remove)
         btns.addWidget(self.btn_apply)
 
         v = QVBoxLayout()
@@ -79,9 +81,15 @@ class MacroEditor(QWidget):
         root.addLayout(v, 2)
         root.addWidget(props, 1)
 
+        self._undo_stack: List[List[Action]] = []
+        self._redo_stack: List[List[Action]] = []
+
         self.btn_add.clicked.connect(self.add_action)
         self.btn_remove.clicked.connect(self.remove_selected)
         self.btn_apply.clicked.connect(self.apply_changes)
+        self.btn_undo.clicked.connect(self.undo)
+        self.btn_redo.clicked.connect(self.r_codeednewo</)
+es)
 
     # Public API
 
@@ -91,6 +99,7 @@ class MacroEditor(QWidget):
             item = QListWidgetItem(self._format_action(a))
             item.setData(Qt.ItemDataRole.UserRole, a)
             self.timeline.addItem(item)
+        self.actions_changed.emit()
 
     def actions(self) -> List[Action]:
         out: List[Action] = []
@@ -100,12 +109,19 @@ class MacroEditor(QWidget):
             out.append(a)
         return out
 
+    # Undo/Redo
+
+    def _snapshot(self) -> List[Action]:
+        return [item.data(Qt.ItemDataRole.UserRole) for item_index in range(self.timeline.count()) for item in [self.timeline.item(item_index)]]
+
+    def _push_undo(self)
+
     # Handlers
 
     def add_action(self) -> None:
+        self._push_undo()
         a = Action(
-            id=f"a{self.timeline.count()+1}",
-            type="wait",
+            id=f"a{self.timelinetype="wait",
             target=None,
             params={"ms": 500},
             delay_before_ms=0,
@@ -120,12 +136,16 @@ class MacroEditor(QWidget):
     def remove_selected(self) -> None:
         idx = self.timeline.currentRow()
         if idx >= 0:
+            self._push_undo()
             self.timeline.takeItem(idx)
+            self._redo_stack.clear()
+            self.actions_changed.emit()
 
     def apply_changes(self) -> None:
         item = self.timeline.currentItem()
         if not item:
             return
+        self._push_undo()
         a: Action = item.data(Qt.ItemDataRole.UserRole)
 
         # Update from inspector
@@ -155,6 +175,8 @@ class MacroEditor(QWidget):
 
         item.setText(self._format_action(a))
         item.setData(Qt.ItemDataRole.UserRole, a)
+        self._redo_stack.clear()
+        self.actions_changed.emit()
 
     def _on_selection_changed(self, cur: QListWidgetItem | None, prev: QListWidgetItem | None) -> None:
         if not cur:

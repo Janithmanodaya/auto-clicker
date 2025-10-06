@@ -144,6 +144,17 @@ class MainWindow(QMainWindow):
 
         splitter.addWidget(self.tree)
         splitter.addWidget(self.editor)
+
+        # Flow view
+        from autoclick_pro.gui.flow_view import FlowView
+        self.flow = FlowView()
+        self.editor.actions_changed.connect(lambda: self.flow.render_actions(self.editor.actions()))
+        self.flow.render_actions(self.editor.actions())
+
+        # Put flow view under utilities
+        pv.addWidget(QLabel("Flow View"))
+        pv.addWidget(self.flow)
+
         splitter.addWidget(self.props)
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 2)

@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 import cv2
 import numpy as np
+
+from autoclick_pro.util.nms import non_max_suppression
 
 
 @dataclass
@@ -23,6 +25,21 @@ class FeatureMatchResult:
     candidates: List[Candidate]
 
 
+def _cluster_points(points: np.ndarray, bin_size: float = 40.0, min_cluster: int = 6) -> List[np.ndarray]:
+    """
+    Simple grid-based clustering of 2D points. Returns list of index arrays.
+    """
+    xs = points[:, 0]
+    ys = points[:, 1]
+    gx = np.floor(xs / bin_size).astype(int)
+    gy = np.floor(ys / bin_size).astype(int)
+    buckets: dict[tuple[int, int], List[int]] = {}
+    for i, (bx, by) in enumerate(zip(gx, gy)):
+        buckets.setdefault((bx, by), []).append(i)
+    clusters = [np.array(idx_list, dtype=int) for idx_list in buckets.values() if len(idx_list) >= min_cluster]
+    return clusters
+
+
 def feature_match(
     screenshot_path: Path,
     template_path: Path,
@@ -32,7 +49,7 @@ def feature_match(
 ) -> FeatureMatchResult:
     """
     Feature-based matching using ORB/AKAZE + BFMatcher + RANSAC homography.
-    Returns multiple candidate bboxes sorted by score.
+    Produces multiple candidates via simple clustering and non-maximum suppression.
     """
     img_color = cv2.imread(str(screenshot_path), cv2.IMREAD_COLOR)
     tmpl_color = cv2.imread(str(template_path), cv2.IMREAD_COLOR)
@@ -57,36 +74,64 @@ def feature_match(
     matches = bf.knnMatch(des1, des2, k=2)
 
     good: list[cv2.DMatch] = []
-    for m, n in matches:
+    for pair in matches:
+        if len(pair) != 2:
+            continue
+        m, n = pair
         if m.distance < 0.75 * n.distance:
             good.append(m)
 
     if len(good) < 4:
         return FeatureMatchResult([])
 
-    # Cluster matches by proximity (basic approach)
-    pts_tmpl = np.float32([kp1[m.queryIdx].pt for m in good]).reshape(-1, 1, 2)
-    pts_img = np.float32([kp2[m.trainIdx].pt for m in good]).reshape(-1, 1, 2)
+    pts_tmpl = np.float32([kp1[m.queryIdx].pt for m in good])
+    pts_img = np.float32([kp2[m.trainIdx].pt for m in good])
 
-    # Compute homography
-    H, mask = cv2.findHomography(pts_tmpl, pts_img, cv2.RANSAC, 5.0)
-    if H is None:
-        return FeatureMatchResult([])
-
-    inliers = int(mask.sum()) if mask is not None else 0
-    score = inliers / max(1, len(good))
+    # Cluster by proximity in image space
+    clusters = _cluster_points(pts_img, bin_size=40.0, min_cluster=6)
+    candidates: List[Candidate] = []
 
     h, w = tmpl.shape[:2]
-    corners = np.float32([[0, 0], [w, 0], [w, h], [0, h]]).reshape(-1, 1, 2)
-    projected = cv2.perspectiveTransform(corners, H)
-    xs = projected[:, 0, 0]
-    ys = projected[:, 0, 1]
-    x_min, y_min, x_max, y_max = int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())
-    bbox = (x_min, y_min, x_max - x_min, y_max - y_min)
+    tmpl_corners = np.float32([[0, 0], [w, 0], [w, h], [0, h]]).reshape(-1, 1, 2)
 
-    candidates = [Candidate(bbox=bbox, score=score)]
-    # Note: For multiple candidates, a robust approach would run sliding window clusters;
-    # here we return a single candidate derived from homography. Placeholder for future NMS.
+    for idxs in clusters:
+        src = pts_tmpl[idxs].reshape(-1, 1, 2)
+        dst = pts_img[idxs].reshape(-1, 1, 2)
+        if src.shape[0] < 4 or dst.shape[0] < 4:
+            continue
+        H, mask = cv2.findHomography(src, dst, cv2.RANSAC, 5.0)
+        if H is None:
+            continue
+        inliers = int(mask.sum()) if mask is not None else 0
+        score = inliers / max(1, src.shape[0])
+        projected = cv2.perspectiveTransform(tmpl_corners, H)
+        xs = projected[:, 0, 0]
+        ys = projected[:, 0, 1]
+        x_min, y_min, x_max, y_max = int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())
+        bbox = (x_min, y_min, max(1, x_max - x_min), max(1, y_max - y_min))
+        if score >= confidence_threshold:
+            candidates.append(Candidate(bbox=bbox, score=score))
+
+    # Fallback: compute global homography if no clusters yielded candidates
+    if not candidates:
+        src = pts_tmpl.reshape(-1, 1, 2)
+        dst = pts_img.reshape(-1, 1, 2)
+        H, mask = cv2.findHomography(src, dst, cv2.RANSAC, 5.0)
+        if H is not None:
+            inliers = int(mask.sum()) if mask is not None else 0
+            score = inliers / max(1, src.shape[0])
+            projected = cv2.perspectiveTransform(tmpl_corners, H)
+            xs = projected[:, 0, 0]
+            ys = projected[:, 0, 1]
+            x_min, y_min, x_max, y_max = int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())
+            bbox = (x_min, y_min, max(1, x_max - x_min), max(1, y_max - y_min))
+            candidates.append(Candidate(bbox=bbox, score=score))
+
+    # Non-maximum suppression on candidate boxes
+    boxes = np.array([c.bbox for c in candidates], dtype=np.int32)
+    scores = np.array([c.score for c in candidates], dtype=np.float32)
+    keep_idx = non_max_suppression(boxes, scores, iou_threshold=0.3)
+    candidates = [candidates[i] for i in keep_idx]
 
     candidates.sort(key=lambda c: c.score, reverse=True)
     return FeatureMatchResult(candidates=candidates[:max_candidates])
