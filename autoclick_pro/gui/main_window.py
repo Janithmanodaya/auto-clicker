@@ -204,7 +204,7 @@ class MainWindow(QMainWindow):
         self.action_simulation.toggled.connect(self.on_simulation_toggled)
         self.action_capture.triggered.connect(self.on_capture)
         self.action_keymap.triggered.connect(self.on_keymap)
-        self.action_label_manager.triggered.connect(self.on_label_mana_codegenewr</)
+        self.action_label_manager.triggered.connect(self.on_label_manager)
         self.btn_detect_demo.clicked.connect(self.on_detect_demo)
         self.btn_detect_feature.clicked.connect(self.on_detect_feature)
         self.btn_loop_test.clicked.connect(self.on_loop_test)
