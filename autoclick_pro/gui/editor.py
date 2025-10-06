@@ -34,6 +34,8 @@ class MacroEditor(QWidget):
         self.timeline = QListWidget()
         self.timeline.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
         self.timeline.setDragDropMode(QListWidget.DragDropMode.InternalMove)
+        self.timeline.setAlternatingRowColors(True)
+        self.timeline.setUniformItemSizes(True)
         self.timeline.currentItemChanged.connect(self._on_selection_changed)
 
         # Right properties panel

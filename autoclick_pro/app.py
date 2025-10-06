@@ -4,6 +4,7 @@ from PySide6.QtCore import Qt, QTimer
 
 from autoclick_pro.gui.main_window import MainWindow
 from autoclick_pro.logging.logger import configure_logging
+from autoclick_pro.gui.styles import DARK_QSS
 
 
 def main():
@@ -16,6 +17,9 @@ def main():
     # High DPI and font rendering hints
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+
+    # Apply theme
+    app.setStyleSheet(DARK_QSS)
 
     window = MainWindow()
     window.show()

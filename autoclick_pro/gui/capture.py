@@ -62,7 +62,9 @@ class CaptureDialog(QDialog):
         if self._start and self._end:
             rect = QRect(self._start, self._end).normalized()
             painter = QPainter(pm)
-            painter.setPen(QColor(0, 255, 0))
+            painter.setPen(QColor(80, 180, 255))
+            # Semi-transparent fill for selection
+            painter.fillRect(rect, QColor(80, 180, 255, 60))
             painter.drawRect(rect)
             painter.end()
         self.label.setPixmap(pm)

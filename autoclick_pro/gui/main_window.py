@@ -47,18 +47,29 @@ class MainWindow(QMainWindow):
         tb.setMovable(False)
         self.addToolBar(tb)
 
-        self.action_record = QAction("Record", self)
-        self.action_play = QAction("Play", self)
-        self.action_pause = QAction("Pause", self)
-        self.action_stop = QAction("Stop", self)
-        self.action_estop = QAction("E-Stop", self)
-        self.action_save = QAction("Save", self)
-        self.action_load = QAction("Load", self)
-        self.action_export = QAction("Export", self)
-        self.action_capture = QAction("Capture Object", self)
+        style = self.style()
+        self.action_record = QAction(style.standardIcon(style.SP_MediaRecord), "Record", self)
+        self.action_play = QAction(style.standardIcon(style.SP_MediaPlay), "Play", self)
+        self.action_pause = QAction(style.standardIcon(style.SP_MediaPause), "Pause", self)
+        self.action_stop = QAction(style.standardIcon(style.SP_MediaStop), "Stop", self)
+        self.action_estop = QAction(style.standardIcon(style.SP_BrowserStop), "E-Stop", self)
+        self.action_save = QAction(style.standardIcon(style.SP_DialogSaveButton), "Save", self)
+        self.action_load = QAction(style.standardIcon(style.SP_DialogOpenButton), "Load", self)
+        self.action_export = QAction(style.standardIcon(style.SP_ComputerIcon), "Export", self)
+        self.action_capture = QAction(style.standardIcon(style.SP_FileIcon), "Capture Object", self)
         self.action_simulation = QAction("Simulation", self)
         self.action_simulation.setCheckable(True)
         self.action_simulation.setChecked(True)
+
+        # Shortcuts
+        self.action_play.setShortcut("F5")
+        self.action_pause.setShortcut("F6")
+        self.action_stop.setShortcut("F7")
+        self.action_estop.setShortcut("F8")
+        self.action_record.setShortcut("F9")
+        self.action_save.setShortcut("Ctrl+S")
+        self.action_load.setShortcut("Ctrl+O")
+        self.action_capture.setShortcut("Ctrl+Shift+C")
 
         for a in (
             self.action_record,
@@ -120,7 +131,10 @@ class MainWindow(QMainWindow):
         # Status bar
         sb = QStatusBar()
         self.setStatusBar(sb)
-        sb.showMessage("Ready (Simulation mode)")
+        sb.showMessage("Ready")
+        self.sim_label = QLabel("Simulation: ON")
+        sb.addPermanentWidget(self.sim_la_codebenewl</)
+)
 
         # Wire actions
         self.action_record.triggered.connect(self.on_record)
@@ -206,6 +220,7 @@ class MainWindow(QMainWindow):
 
     def on_simulation_toggled(self, checked: bool):
         self.log.info("simulation_mode_toggled", checked=checked)
+        self.sim_label.setText(f"Simulation: {'ON' if checked else 'OFF'}")
         self.statusBar().showMessage(f"Simulation mode: {'ON' if checked else 'OFF'}")
 
     def on_capture(self):
