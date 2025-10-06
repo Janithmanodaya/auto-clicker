@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from autoclick_pro.logging.logger import get_logger
+from autoclick_pro.core.engine import Engine
 
 
 class MainWindow(QMainWindow):
@@ -26,10 +27,14 @@ class MainWindow(QMainWindow):
         self.resize(1200, 800)
         self.log = get_logger()
 
+        # Engine
+        self.engine = Engine()
+        self.engine.on_status(lambda s: self.statusBar().showMessage(s))
+
         # Toolbar
         tb = QToolBar("Main")
         tb.setMovable(False)
-        self.addToolBar(tb)
+        self.addToolBar_code(tnewb</)
 
         self.action_record = QAction("Record", self)
         self.action_play = QAction("Play", self)
@@ -101,7 +106,9 @@ class MainWindow(QMainWindow):
         # Wire actions
         self.action_record.triggered.connect(self.on_record)
         self.action_play.triggered.connect(self.on_play)
-        self.action_pause.triggered.connect(self.on_pause)
+        self.action_pause.triggered.connect(lambda: self.engine.pause())
+        self.action_stop.triggered.connect(lambda: self.engine.stop())
+        self.action_estop.triggered.connect(lambda: self.engine.est        self.action_pause.triggered.connect(self.on_pause)
         self.action_stop.triggered.connect(self.on_stop)
         self.action_estop.triggered.connect(self.on_estop)
         self.action_save.triggered.connect(self.on_save)
@@ -117,18 +124,25 @@ class MainWindow(QMainWindow):
     def on_play(self):
         sim = self.action_simulation.isChecked()
         self.log.info("play_clicked", simulation=sim)
+        self.engine.set_simulation(sim)
         self.statusBar().showMessage("Playing macro (simulation=%s)..." % sim)
+
+        # Demo timeline: click current mouse position, wait, and type text
+
 
     def on_pause(self):
         self.log.info("pause_clicked")
+        self.engine.pause()
         self.statusBar().showMessage("Paused")
 
     def on_stop(self):
         self.log.info("stop_clicked")
+        self.engine.stop()
         self.statusBar().showMessage("Stopped")
 
     def on_estop(self):
         self.log.warning("EMERGENCY_STOP_TRIGGERED")
+        self.engine.estop()
         self.statusBar().showMessage("EMERGENCY STOP!")
 
     def on_save(self):
