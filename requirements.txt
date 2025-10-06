@@ -12,3 +12,4 @@ pytesseract>=0.3
 jsonschema>=4.19
 pytest>=7.0
 loguru>=0.7
+pyinstaller>=6.16
