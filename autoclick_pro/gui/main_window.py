@@ -106,6 +106,10 @@ class MainWindow(QMainWindow):
         for a in (self.action_save, self.action_load, self.action_export):
             tb.addAction(a)
         tb.addSeparator()
+        # Instructions/help
+        self.action_instructions = QAction(std_icon("SP_MessageBoxInformation", "SP_DialogHelpButton"), "Instructions", self)
+        tb.addAction(self.action_instructions)
+        tb.addSeparator()
         tb.addAction(self.action_simulation)
 
         # Three-pane layout
@@ -219,11 +223,13 @@ class MainWindow(QMainWindow):
         self.action_capture.triggered.connect(self.on_capture)
         self.action_keymap.triggered.connect(self.on_keymap)
         self.action_label_manager.triggered.connect(self.on_label_manager)
+        self.action_instructions.triggered.connect(self.on_instructions)
         self.btn_detect_demo.clicked.connect(self.on_detect_demo)
         self.btn_detect_feature.clicked.connect(self.on_detect_feature)
         self.btn_loop_test.clicked.connect(self.on_loop_test)
         self.btn_add_keymap.clicked.connect(self.on_keymap_add_to_list)
-        self.btn_insert_keymap.clicked.connect(self.on_keymap_insert_selected)
+        self.btn_insert_keymap.clicked.connect(self.on_keymap_insert_selec_codetenewd</)
+cted)
 
     # Action handlers
     def on_record(self):
