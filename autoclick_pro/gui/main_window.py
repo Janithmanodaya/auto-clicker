@@ -73,6 +73,8 @@ class MainWindow(QMainWindow):
 
         # Keymap editor action
         self.action_keymap = QAction(style.standardIcon(style.SP_DirIcon), "Keymap Editor", self)
+        # Label manager action
+        self.action_label_manager = QAction(style.standardIcon(style.SP_DialogYesButton), "Label Manager", self)
 
         for a in (
             self.action_record,
@@ -85,6 +87,7 @@ class MainWindow(QMainWindow):
         tb.addSeparator()
         tb.addAction(self.action_capture)
         tb.addAction(self.action_keymap)
+        tb.addAction(self.action_label_manager)
         tb.addSeparator()
         for a in (self.action_save, self.action_load, self.action_export):
             tb.addAction(a)
@@ -155,6 +158,26 @@ class MainWindow(QMainWindow):
         pv.addWidget(QLabel("Flow View"))
         pv.addWidget(self.flow)
 
+        # Graph-based timeline editor
+        from autoclick_pro.gui.graph_editor import GraphEditor
+        pv.addWidget(QLabel("Graph Editor (Double-click a node to link targets)"))
+        self.graph = GraphEditor()
+        pv.addWidget(self.graph)
+        self.graph.render_actions(self.editor.actions())
+        self.editor.actions_changed.connect(lambda: (self.flow.render_actions(self.editor.actions()), self.graph.render_actions(self.editor.actions())))
+
+        # Link mode for conditional jumps
+        from PySide6.QtWidgets import QHBoxLayout, QRadioButton
+        link_row = QHBoxLayout()
+        pv.addLayout(link_row)
+        self.rb_true = QRadioButton("Link TRUE")
+        self.rb_false = QRadioButton("Link FALSE")
+        self.rb_true.setChecked(True)
+        link_row.addWidget(self.rb_true)
+        link_row.addWidget(self.rb_false)
+
+        self.graph.node_activated.connect(self.on_graph_node_activated)
+
         splitter.addWidget(self.props)
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 2)
@@ -181,6 +204,7 @@ class MainWindow(QMainWindow):
         self.action_simulation.toggled.connect(self.on_simulation_toggled)
         self.action_capture.triggered.connect(self.on_capture)
         self.action_keymap.triggered.connect(self.on_keymap)
+        self.action_label_manager.triggered.connect(self.on_label_mana_codegenewr</)
         self.btn_detect_demo.clicked.connect(self.on_detect_demo)
         self.btn_detect_feature.clicked.connect(self.on_detect_feature)
         self.btn_loop_test.clicked.connect(self.on_loop_test)
@@ -268,6 +292,8 @@ class MainWindow(QMainWindow):
                 actions = self.editor.actions()
                 actions.append(a)
                 self.editor.set_actions(actions)
+                self.flow.render_actions(actions)
+                self.graph.render_actions(actions)
                 self.log.info("keymap_added_action", params=act.get("params"))
                 self.statusBar().showMessage("Keymap action added")
 
@@ -322,6 +348,41 @@ class MainWindow(QMainWindow):
                 dlg.exec()
                 break
 
+    def on_label_manager(self):
+        from autoclick_pro.gui.label_manager import LabelManager
+        dlg = LabelManager(self, actions=self.editor.actions())
+        if dlg.exec():
+            new_label = dlg.new_label_action()
+            if new_label:
+                actions = self.editor.actions()
+                actions.append(new_label)
+                self.editor.set_actions(actions)
+                self.flow.render_actions(actions)
+                self.graph.render_actions(actions)
+                self.statusBar().showMessage(f"Label '{new_label.target}' added")
+
+    def on_graph_node_activated(self, target_id: str):
+        # Link selected node to current conditional jump
+        item = self.editor.timeline.currentItem()
+        if not item:
+            self.statusBar().showMessage("Select a conditional_jump action in the editor first.")
+            return
+        a = item.data(Qt.ItemDataRole.UserRole)
+        if not a or a.type != "conditional_jump":
+            self.statusBar().showMessage("Current selection is not a conditional_jump.")
+            return
+        params = dict(a.params or {})
+        if self.rb_true.isChecked():
+            params["true_target"] = target_id
+        else:
+            params["false_target"] = target_id
+        a.params = params
+        item.setData(Qt.ItemDataRole.UserRole, a)
+        item.setText(self.editor._format_action(a))
+        self.flow.render_actions(self.editor.actions())
+        self.graph.render_actions(self.editor.actions())
+        self.statusBar().showMessage(f"Linked conditional to {target_id} ({'true' if self.rb_true.isChecked() else 'false'})")
+
     def on_loop_test(self):
         # Build a demo macro: label -> detect -> conditional_jump -> loop_until
         actions = [
@@ -363,4 +424,6 @@ class MainWindow(QMainWindow):
         actions = self.editor.actions()
         actions.append(a)
         self.editor.set_actions(actions)
+        self.flow.render_actions(actions)
+        self.graph.render_actions(actions)
         self.statusBar().showMessage("Inserted keymap action into macro")
