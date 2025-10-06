@@ -73,7 +73,8 @@ class MainWindow(QMainWindow):
         self.action_capture = QAction(std_icon("SP_FileIcon", "SP_DialogOpenButton"), "Capture Object", self)
         self.action_simulation = QAction("Simulation", self)
         self.action_simulation.setCheckable(True)
-        self.action_simulation.setChecked(True)
+        # Default to real execution; enable this to simulate without performing real clicks/keys
+        self.action_simulation.setChecked(False)
 
         # Shortcuts
         self.action_play.setShortcut("F5")
