@@ -49,7 +49,7 @@ class FlowView(QGraphicsView):
             t = QGraphicsTextItem(label)
             t.setDefaultTextColor(QColor("#e0e0e0"))
             t.setPos(mid.x() + 4, mid.y() - 18)
-            scene.addIte_codem(newt</)
+            scene.addItem(t)
 
     def render_actions(self, actions: List[Action]) -> None:
         scene = self.scene()
