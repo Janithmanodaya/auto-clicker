@@ -48,7 +48,8 @@ class MainWindow(QMainWindow):
         self.addToolBar(tb)
 
         style = self.style()
-        self.action_record = QAction(style.standardIcon(style.SP_MediaRecord), "Record", self)
+        # Qt does not provide a MediaRecord standard icon; use Apply as a reasonable substitute
+        self.action_record = QAction(style.standardIcon(style.SP_DialogApplyButton), "Record", self)
         self.action_play = QAction(style.standardIcon(style.SP_MediaPlay), "Play", self)
         self.action_pause = QAction(style.standardIcon(style.SP_MediaPause), "Pause", self)
         self.action_stop = QAction(style.standardIcon(style.SP_MediaStop), "Stop", self)
