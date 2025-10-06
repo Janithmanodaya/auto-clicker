@@ -48,7 +48,8 @@ class MainWindow(QMainWindow):
         self.addToolBar(tb)
 
         style = self.style()
-        self.action_record = QAction(style.standardIcon(style.SP_MediaRecord), "Record", self)
+        # Qt does not provide a MediaRecord standard icon; use Apply as a reasonable substitute
+        self.action_record = QAction(style.standardIcon(style.SP_DialogApplyButton), "Record", self)
         self.action_play = QAction(style.standardIcon(style.SP_MediaPlay), "Play", self)
         self.action_pause = QAction(style.standardIcon(style.SP_MediaPause), "Pause", self)
         self.action_stop = QAction(style.standardIcon(style.SP_MediaStop), "Stop", self)
@@ -204,7 +205,7 @@ class MainWindow(QMainWindow):
         self.action_simulation.toggled.connect(self.on_simulation_toggled)
         self.action_capture.triggered.connect(self.on_capture)
         self.action_keymap.triggered.connect(self.on_keymap)
-        self.action_label_manager.triggered.connect(self.on_label_mana_codegenewr</)
+        self.action_label_manager.triggered.connect(self.on_label_manager)
         self.btn_detect_demo.clicked.connect(self.on_detect_demo)
         self.btn_detect_feature.clicked.connect(self.on_detect_feature)
         self.btn_loop_test.clicked.connect(self.on_loop_test)

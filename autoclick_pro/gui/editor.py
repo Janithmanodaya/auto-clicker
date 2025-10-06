@@ -29,8 +29,7 @@ class MacroEditor(QWidget):
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
-        root = QHBoxLayout(s_codeelnewf</)
-lf)
+        root = QHBoxLayout(self)
 
         # Timeline list
         self.timeline = QListWidget()
@@ -47,7 +46,7 @@ lf)
 
         self.input_id = QLineEdit()
         self.input_type = QComboBox()
-        self.input_type.addItems(["wait", "mouse_click", "key_sequence", "detect", "conditional_jump"])
+        self.input_type.addItems(["wait", "mouse_click", "key_sequence", "detect", "conditional_jump", "label", "loop_until"])
         self.input_target = QLineEdit()
         self.input_params = QLineEdit()
         self.input_delay_before = QSpinBox()
@@ -71,8 +70,12 @@ lf)
         self.btn_remove = QPushButton("Remove Selected")
         self.btn_apply = QPushButton("Apply Changes")
         self.btn_undo = QPushButton("Undo")
-        self.btn_red.btn_remove)
+        self.btn_redo = QPushButton("Redo")
+        btns.addWidget(self.btn_add)
+        btns.addWidget(self.btn_remove)
         btns.addWidget(self.btn_apply)
+        btns.addWidget(self.btn_undo)
+        btns.addWidget(self.btn_redo)
 
         v = QVBoxLayout()
         v.addWidget(self.timeline)
@@ -88,8 +91,7 @@ lf)
         self.btn_remove.clicked.connect(self.remove_selected)
         self.btn_apply.clicked.connect(self.apply_changes)
         self.btn_undo.clicked.connect(self.undo)
-        self.btn_redo.clicked.connect(self.r_codeednewo</)
-es)
+        self.btn_redo.clicked.connect(self.redo)
 
     # Public API
 
@@ -112,16 +114,39 @@ es)
     # Undo/Redo
 
     def _snapshot(self) -> List[Action]:
-        return [item.data(Qt.ItemDataRole.UserRole) for item_index in range(self.timeline.count()) for item in [self.timeline.item(item_index)]]
+        return [
+            self.timeline.item(idx).data(Qt.ItemDataRole.UserRole)
+            for idx in range(self.timeline.count())
+        ]
 
-    def _push_undo(self)
+    def _push_undo(self) -> None:
+        self._undo_stack.append(self._snapshot())
+        # clear redo when new change happens
+        self._redo_stack.clear()
+
+    def undo(self) -> None:
+        if not self._undo_stack:
+            return
+        current = self._snapshot()
+        prev = self._undo_stack.pop()
+        self._redo_stack.append(current)
+        self.set_actions(prev)
+
+    def redo(self) -> None:
+        if not self._redo_stack:
+            return
+        current = self._snapshot()
+        nxt = self._redo_stack.pop()
+        self._undo_stack.append(current)
+        self.set_actions(nxt)
 
     # Handlers
 
     def add_action(self) -> None:
         self._push_undo()
         a = Action(
-            id=f"a{self.timelinetype="wait",
+            id=f"a{self.timeline.count()+1}",
+            type="wait",
             target=None,
             params={"ms": 500},
             delay_before_ms=0,
@@ -132,13 +157,13 @@ es)
         item.setData(Qt.ItemDataRole.UserRole, a)
         self.timeline.addItem(item)
         self.timeline.setCurrentItem(item)
+        self.actions_changed.emit()
 
     def remove_selected(self) -> None:
         idx = self.timeline.currentRow()
         if idx >= 0:
             self._push_undo()
             self.timeline.takeItem(idx)
-            self._redo_stack.clear()
             self.actions_changed.emit()
 
     def apply_changes(self) -> None:
@@ -148,13 +173,11 @@ es)
         self._push_undo()
         a: Action = item.data(Qt.ItemDataRole.UserRole)
 
-        # Update from inspector
         a.id = self.input_id.text().strip() or a.id
         a.type = self.input_type.currentText()
         tgt = self.input_target.text().strip()
         a.target = tgt or None
 
-        # Params as JSON-like simple parser: key=value pairs separated by commas
         raw = self.input_params.text().strip()
         params = {}
         if raw:
@@ -162,7 +185,6 @@ es)
                 import json
                 params = json.loads(raw)
             except Exception:
-                # Fallback: key=value, comma-separated
                 for part in raw.split(","):
                     if "=" in part:
                         k, v = part.split("=", 1)
@@ -175,7 +197,6 @@ es)
 
         item.setText(self._format_action(a))
         item.setData(Qt.ItemDataRole.UserRole, a)
-        self._redo_stack.clear()
         self.actions_changed.emit()
 
     def _on_selection_changed(self, cur: QListWidgetItem | None, prev: QListWidgetItem | None) -> None:
@@ -186,7 +207,6 @@ es)
         idx = max(0, self.input_type.findText(a.type))
         self.input_type.setCurrentIndex(idx)
         self.input_target.setText(a.target or "")
-        # Show params as JSON
         try:
             import json
             self.input_params.setText(json.dumps(a.params))
@@ -195,8 +215,6 @@ es)
         self.input_delay_before.setValue(int(a.delay_before_ms))
         self.input_delay_after.setValue(int(a.delay_after_ms))
         self.input_repeat.setValue(int(a.repeat_count))
-
-    # Utils
 
     def _format_action(self, a: Action) -> str:
         core = f"{a.id}: {a.type}"
@@ -215,4 +233,12 @@ es)
             tgt = a.target or ""
             thr = a.params.get("conf", "")
             core += f" ({tgt}, conf={thr})"
+        elif a.type == "conditional_jump":
+            params = a.params or {}
+            core += f" (true->{params.get('true_target')}, false->{params.get('false_target')})"
+        elif a.type == "label":
+            core += f" ({a.target or a.id})"
+        elif a.type == "loop_until":
+            params = a.params or {}
+            core += f" (label={params.get('label')}, max={params.get('max_iters', 0)})"
         return core
