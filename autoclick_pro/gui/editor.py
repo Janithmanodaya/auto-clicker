@@ -45,7 +45,7 @@ class MacroEditor(QWidget):
 
         self.input_id = QLineEdit()
         self.input_type = QComboBox()
-        self.input_type.addItems(["wait", "mouse_click", "key_sequence", "detect"])
+        self.input_type.addItems(["wait", "mouse_click", "key_sequence", "detect", "conditional_jump"])
         self.input_target = QLineEdit()
         self.input_params = QLineEdit()
         self.input_delay_before = QSpinBox()

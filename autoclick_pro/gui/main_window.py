@@ -71,6 +71,9 @@ class MainWindow(QMainWindow):
         self.action_load.setShortcut("Ctrl+O")
         self.action_capture.setShortcut("Ctrl+Shift+C")
 
+        # Keymap editor action
+        self.action_keymap = QAction(style.standardIcon(style.SP_DirIcon), "Keymap Editor", self)
+
         for a in (
             self.action_record,
             self.action_play,
@@ -81,6 +84,7 @@ class MainWindow(QMainWindow):
             tb.addAction(a)
         tb.addSeparator()
         tb.addAction(self.action_capture)
+        tb.addAction(self.action_keymap)
         tb.addSeparator()
         for a in (self.action_save, self.action_load, self.action_export):
             tb.addAction(a)
@@ -133,8 +137,7 @@ class MainWindow(QMainWindow):
         self.setStatusBar(sb)
         sb.showMessage("Ready")
         self.sim_label = QLabel("Simulation: ON")
-        sb.addPermanentWidget(self.sim_la_codebenewl</)
-)
+        sb.addPermanentWidget(self.sim_label)
 
         # Wire actions
         self.action_record.triggered.connect(self.on_record)
@@ -147,6 +150,7 @@ class MainWindow(QMainWindow):
         self.action_export.triggered.connect(self.on_export)
         self.action_simulation.toggled.connect(self.on_simulation_toggled)
         self.action_capture.triggered.connect(self.on_capture)
+        self.action_keymap.triggered.connect(self.on_keymap)
         self.btn_detect_demo.clicked.connect(self.on_detect_demo)
 
     # Action handlers
@@ -218,6 +222,21 @@ class MainWindow(QMainWindow):
             self.log.info("export_clicked", path=path)
             self.statusBar().showMessage(f"Export target set to {path}")
 
+    def on_keymap(self):
+        from autoclick_pro.gui.keymap_editor import KeymapEditor
+        dlg = KeymapEditor(self)
+        if dlg.exec():
+            act = dlg.result_action()
+            if act:
+                # Append as Action object
+                from autoclick_pro.data.model import Action as ActionModel
+                a = ActionModel(id=f"a{len(self.editor.actions())+1}", type=act["type"], target=None, params=act.get("params", {}))
+                actions = self.editor.actions()
+                actions.append(a)
+                self.editor.set_actions(actions)
+                self.log.info("keymap_added_action", params=act.get("params"))
+                self.statusBar().showMessage("Keymap action added")
+
     def on_simulation_toggled(self, checked: bool):
         self.log.info("simulation_mode_toggled", checked=checked)
         self.sim_label.setText(f"Simulation: {'ON' if checked else 'OFF'}")
@@ -236,8 +255,16 @@ class MainWindow(QMainWindow):
                 self.statusBar().showMessage(f"Captured template: {tmpl_path}")
 
     def on_detect_demo(self):
-        # Execute first detect action via engine (simulation mode does not affect detect)
+        # Visual inspector for first detect action
+        from autoclick_pro.util.screen import grab_screen
+        from autoclick_pro.detect.template_matcher import match_template
+        from autoclick_pro.gui.detect_inspector import DetectInspector
+
         for a in self.editor.actions():
             if a.type == "detect":
-                self.engine._execute({"id": a.id, "type": "detect", "target": a.target, "params": a.params})
+                screen = grab_screen()
+                conf = float(a.params.get("conf", 0.85))
+                res = match_template(Path(screen), Path(str(a.target)), confidence_threshold=conf)
+                dlg = DetectInspector(self, screenshot_path=Path(screen), bbox=res.bbox, score=res.score)
+                dlg.exec()
                 break

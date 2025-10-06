@@ -42,6 +42,7 @@ class Engine:
             return
         self._stop.clear()
         self._pause.clear()
+        self._context = {"last_detect": None}
         self._worker = threading.Thread(target=self._run, args=(list(actions),), daemon=True)
         self._worker.start()
 
@@ -70,21 +71,35 @@ class Engine:
 
     def _run(self, actions: list[dict]) -> None:
         self._emit("Running")
-        for idx, action in enumerate(actions):
+        # Build index mapping for jumps
+        id_to_index: dict[str, int] = {}
+        for i, a in enumerate(actions):
+            aid = str(a.get("id") or "")
+            if aid:
+                id_to_index[aid] = i
+
+        i = 0
+        while i < len(actions):
             if self._stop.is_set():
                 break
             while self._pause.is_set() and not self._stop.is_set():
                 time.sleep(0.05)
 
+            action = actions[i]
             try:
-                self._execute(action)
+                next_idx = self._execute(action, id_to_index=id_to_index, current_index=i, actions=actions)
             except Exception as e:
-                self._log.error("engine_action_error", index=idx, error=str(e))
+                self._log.error("engine_action_error", index=i, error=str(e))
                 break
+
+            if isinstance(next_idx, int):
+                i = next_idx
+            else:
+                i += 1
 
         self._emit("Idle")
 
-    def _execute(self, action: dict) -> None:
+    def _execute(self, action: dict, *, id_to_index: dict[str, int] | None = None, current_index: int | None = None, actions: list[dict] | None = None) -> int | None:
         t = action.get("type")
         params = action.get("params", {})
         delay_before = int(action.get("delay_before_ms", 0))
@@ -131,11 +146,38 @@ class Engine:
                 screen_path = grab_screen()
                 res = match_template(Path(screen_path), Path(str(tmpl)), confidence_threshold=conf)
                 self._log.info("detect_result", target=tmpl, found=res.found, score=res.score, bbox=res.bbox)
-                # Store last detection in params for potential downstream use
-                action.setdefault("result", {"found": res.found, "bbox": res.bbox, "score": res.score})
+                self._context["last_detect"] = {"found": res.found, "bbox": res.bbox, "score": res.score}
+                action.setdefault("result", self._context["last_detect"])
+
+            elif t == "conditional_jump":
+                # Example params:
+                # {"test": "last_detect", "true_target": "a5", "false_target": "a10"}
+                test = params.get("test", "last_detect")
+                true_target = params.get("true_target")
+                false_target = params.get("false_target")
+                cond = False
+                if test == "last_detect":
+                    ld = self._context.get("last_detect")
+                    cond = bool(ld and ld.get("found"))
+                elif isinstance(test, str) and test.startswith("var:"):
+                    # Optional future var check
+                    name = test.split(":", 1)[1]
+                    cond = bool(self._context.get(name))
+                # Determine next index
+                target_id = true_target if cond else false_target
+                if target_id and id_to_index and target_id in id_to_index:
+                    next_index = id_to_index[target_id]
+                    self._log.info("conditional_jump", cond=cond, target=target_id, index=next_index)
+                    # return next index for outer loop to jump
+                    return next_index
+                else:
+                    self._log.info("conditional_jump_no_target", cond=cond)
+                    # fall-through (continue to next action)
 
             else:
                 self._log.warning("unknown_action_type", type=t)
 
         if delay_after:
             time.sleep(delay_after / 1000.0)
+
+        return None
