@@ -120,6 +120,20 @@ class Engine:
                         self.keyboard.press_keys(seq)
                 self._log.info("key_sequence", sequence=seq, text_mode=text_mode)
 
+            elif t == "detect":
+                # Capture current screen and run template match
+                from pathlib import Path
+                from autoclick_pro.util.screen import grab_screen
+                from autoclick_pro.detect.template_matcher import match_template
+
+                tmpl = action.get("target")
+                conf = float(params.get("conf", 0.85))
+                screen_path = grab_screen()
+                res = match_template(Path(screen_path), Path(str(tmpl)), confidence_threshold=conf)
+                self._log.info("detect_result", target=tmpl, found=res.found, score=res.score, bbox=res.bbox)
+                # Store last detection in params for potential downstream use
+                action.setdefault("result", {"found": res.found, "bbox": res.bbox, "score": res.score})
+
             else:
                 self._log.warning("unknown_action_type", type=t)
 
