@@ -36,8 +36,11 @@ call ".venv\Scripts\activate.bat"
 rem Ensure pip exists in the venv (handles cases where pip was not bootstrapped)
 python -m ensurepip --upgrade
 
-python -m pip install --upgrade pip wheel setuptools
-pip install -r requirements.txt
+rem Purge pip cache to reduce space usage (safe if empty)
+python -m pip cache purge
+
+python -m pip install --upgrade --no-cache-dir pip wheel setuptools
+pip install --no-cache-dir -r requirements.txt
 
 echo Dependencies installed into virtual environment: %cd%\.venv
 echo.

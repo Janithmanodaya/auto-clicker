@@ -39,9 +39,24 @@ def ensure_pyinstaller():
     except Exception:
         print("PyInstaller not found. Installing...", flush=True)
         ensure_pip()
-        # Install the latest PyInstaller (compatible with latest Python)
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "pip", "wheel", "setuptools"])
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "pyinstaller"])
+        # Try to minimize disk usage during installation
+        try:
+            # Purge pip cache to free space (harmless if empty)
+            subprocess.run([sys.executable, "-m", "pip", "cache", "purge"], check=False)
+            # Upgrade core packaging tools without caching
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "--no-cache-dir", "pip", "wheel", "setuptools"])
+            # Install PyInstaller with no cache to reduce space usage
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "--no-cache-dir", "pyinstaller"])
+        except subprocess.CalledProcessError as e:
+            print("Failed to install PyInstaller via pip.", flush=True)
+            print("Common causes:", flush=True)
+            print("  - No space left on device (clear disk space or pip cache)", flush=True)
+            print("  - Network issues or restricted environment", flush=True)
+            print("Mitigations:", flush=True)
+            print("  - Run: python -m pip cache purge", flush=True)
+            print("  - Re-run with environment variable: set PIP_NO_CACHE_DIR=1", flush=True)
+            print("  - Ensure the drive containing the virtualenv (.venv) has free space", flush=True)
+            raise
         import PyInstaller.__main__ as pi  # type: ignore
         return pi
 
