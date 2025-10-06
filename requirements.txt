@@ -1,0 +1,14 @@
+PySide6>=6.6
+numpy>=1.24
+opencv-python>=4.8
+pynput>=1.7
+pyautogui>=0.9
+Pillow>=10.0
+mss>=9.0
+keyring>=24.0
+cryptography>=41.0
+argon2-cffi>=23.1
+pytesseract>=0.3
+jsonschema>=4.19
+pytest>=7.0
+loguru>=0.7
