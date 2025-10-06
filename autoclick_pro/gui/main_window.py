@@ -228,8 +228,7 @@ class MainWindow(QMainWindow):
         self.btn_detect_feature.clicked.connect(self.on_detect_feature)
         self.btn_loop_test.clicked.connect(self.on_loop_test)
         self.btn_add_keymap.clicked.connect(self.on_keymap_add_to_list)
-        self.btn_insert_keymap.clicked.connect(self.on_keymap_insert_selec_codetenewd</)
-cted)
+        self.btn_insert_keymap.clicked.connect(self.on_keymap_insert_selected)
 
     # Action handlers
     def on_record(self):
@@ -447,3 +446,10 @@ cted)
         self.flow.render_actions(actions)
         self.graph.render_actions(actions)
         self.statusBar().showMessage("Inserted keymap action into macro")
+
+    def on_instructions(self):
+        # Open instructions/help dialog
+        from autoclick_pro.gui.instructions import InstructionsDialog
+        dlg = InstructionsDialog(self)
+        dlg.ex_codeecnew(</)
+")
