@@ -84,9 +84,9 @@ class MainWindow(QMainWindow):
         self.action_capture.setShortcut("Ctrl+Shift+C")
 
         # Keymap editor action
-        self.action_keymap = QAction(style.standardIcon(style.SP_DirIcon), "Keymap Editor", self)
+        self.action_keymap = QAction(std_icon("SP_DirIcon", "SP_DirOpenIcon", "SP_DialogOpenButton"), "Keymap Editor", self)
         # Label manager action
-        self.action_label_manager = QAction(style.standardIcon(style.SP_DialogYesButton), "Label Manager", self)
+        self.action_label_manager = QAction(std_icon("SP_DialogYesButton", "SP_DialogOkButton", "SP_DialogApplyButton"), "Label Manager", self)
 
         for a in (
             self.action_record,
