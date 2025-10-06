@@ -451,5 +451,4 @@ class MainWindow(QMainWindow):
         # Open instructions/help dialog
         from autoclick_pro.gui.instructions import InstructionsDialog
         dlg = InstructionsDialog(self)
-        dlg.ex_codeecnew(</)
-")
+        dlg.exec()
