@@ -270,6 +270,8 @@ class MainWindow(QMainWindow):
                 }
             )
         self.engine.start(acts)
+        # Minimize the app window while playing so it doesn't obstruct or capture focus
+        self.showMinimized()
 
     def on_save(self):
         path, _ = QFileDialog.getSaveFileName(self, "Save Project", filter="Project JSON (*.json)")

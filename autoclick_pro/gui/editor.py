@@ -58,10 +58,15 @@ class MacroEditor(QWidget):
         self.input_repeat = QSpinBox()
         self.input_repeat.setRange(1, 10_000)
 
+        # Extra input shown only for key_sequence actions
+        self.input_keyseq = QLineEdit()
+        self.input_keyseq.setPlaceholderText("Enter text or comma-separated keys, e.g. Hello world, ENTER")
+
         pf.addRow(QLabel("ID"), self.input_id)
         pf.addRow(QLabel("Type"), self.input_type)
         pf.addRow(QLabel("Target"), self.input_target)
         pf.addRow(QLabel("Params (JSON)"), self.input_params)
+        pf.addRow(QLabel("Key sequence"), self.input_keyseq)
         pf.addRow(QLabel("Delay before (ms)"), self.input_delay_before)
         pf.addRow(QLabel("Delay after (ms)"), self.input_delay_after)
         pf.addRow(QLabel("Repeat count"), self.input_repeat)
@@ -112,6 +117,10 @@ class MacroEditor(QWidget):
         self.btn_add_click_pick.clicked.connect(self.add_click_pick)
         self.btn_add_keyseq.clicked.connect(self.add_keyseq_action)
         self.btn_add_label.clicked.connect(self.add_label_action)
+
+        # Update visibility of keyseq input when type changes
+        self.input_type.currentTextChanged.connect(self._update_keyseq_visibility)
+        self._update_keyseq_visibility(self.input_type.currentText())
 
         self.pick_captured.connect(self._on_pick_captured)
 
@@ -277,17 +286,27 @@ class MacroEditor(QWidget):
         tgt = self.input_target.text().strip()
         a.target = tgt or None
 
-        raw = self.input_params.text().strip()
+        # Build params
         params = {}
-        if raw:
-            try:
-                import json
-                params = json.loads(raw)
-            except Exception:
-                for part in raw.split(","):
-                    if "=" in part:
-                        k, v = part.split("=", 1)
-                        params[k.strip()] = v.strip()
+        # If this is a key_sequence, prefer the dedicated input box
+        if a.type == "key_sequence":
+            text = self.input_keyseq.text().strip()
+            if text:
+                # Split on commas but keep plain text as single entry if no comma
+                parts = [p.strip() for p in text.split(",")] if "," in text else [text]
+                params = {"sequence": parts, "text_mode": True}
+        # Fallback to generic params field if provided
+        if not params:
+            raw = self.input_params.text().strip()
+            if raw:
+                try:
+                    import json
+                    params = json.loads(raw)
+                except Exception:
+                    for part in raw.split(","):
+                        if "=" in part:
+                            k, v = part.split("=", 1)
+                            params[k.strip()] = v.strip()
         a.params = params
 
         a.delay_before_ms = int(self.input_delay_before.value())
@@ -311,6 +330,16 @@ class MacroEditor(QWidget):
             self.input_params.setText(json.dumps(a.params))
         except Exception:
             self.input_params.setText(str(a.params))
+        # Populate the dedicated key sequence field when applicable
+        if a.type == "key_sequence":
+            seq = a.params.get("sequence", [])
+            if isinstance(seq, (list, tuple)):
+                self.input_keyseq.setText(", ".join(map(str, seq)))
+            else:
+                self.input_keyseq.setText(str(seq))
+        else:
+            self.input_keyseq.clear()
+        self._update_keyseq_visibility(a.type)
         self.input_delay_before.setValue(int(a.delay_before_ms))
         self.input_delay_after.setValue(int(a.delay_after_ms))
         self.input_repeat.setValue(int(a.repeat_count))
@@ -341,3 +370,8 @@ class MacroEditor(QWidget):
             params = a.params or {}
             core += f" (label={params.get('label')}, max={params.get('max_iters', 0)})"
         return core
+
+    def _update_keyseq_visibility(self, current_type: str) -> None:
+        # Show the dedicated key sequence input only for key_sequence actions
+        is_keyseq = current_type == "key_sequence"
+        self.input_keyseq.setVisible(is_keyseq)
